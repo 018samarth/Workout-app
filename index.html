@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0D0D0F" />
+  <meta name="description" content="Premium workout log and calories tracker — all offline, no account needed." />
+  <title>FitTrack Pro</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- App Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+<!-- ═══════════════════════════════════════════
+     ROOT APP SHELL
+════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- ─── CONFETTI CANVAS (fullscreen overlay, JS-driven) ─── -->
+  <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+
+  <!-- ─── TOAST NOTIFICATION ─── -->
+  <div id="toast" role="status" aria-live="polite" aria-atomic="true">
+    <span id="toast-icon"></span>
+    <span id="toast-message"></span>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       STICKY TOP SUMMARY BAR
+  ═══════════════════════════════════════ -->
+  <header id="top-bar" role="banner">
+    <div class="top-bar-pill" data-tab-link="tab-food" title="Calories remaining today">
+      <span class="top-bar-label">Kcal left</span>
+      <span id="tb-calories-left" class="top-bar-value" data-unit="kcal">—</span>
+    </div>
+    <div class="top-bar-pill" data-tab-link="tab-food" title="Protein remaining today">
+      <span class="top-bar-label">Protein left</span>
+      <span id="tb-protein-left" class="top-bar-value" data-unit="g">—</span>
+    </div>
+    <div class="top-bar-pill" data-tab-link="tab-log" title="Workouts this week">
+      <span class="top-bar-label">This week</span>
+      <span id="tb-workouts-week" class="top-bar-value">—</span>
+    </div>
+    <div class="top-bar-pill" data-tab-link="tab-log" title="Current training streak">
+      <span class="top-bar-label">Streak</span>
+      <span id="tb-streak" class="top-bar-value">—</span>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════
+       TAB PANELS CONTAINER
+  ═══════════════════════════════════════ -->
+  <main id="tab-container" role="main">
+
+    <!-- ────────────────────────────────────
+         TAB 1 · TODAY
+    ──────────────────────────────────── -->
+    <section
+      id="tab-today"
+      class="tab-panel active"
+      role="tabpanel"
+      aria-labelledby="nav-today"
+      data-tab="today"
+    >
+      <!-- Date navigation -->
+      <div class="date-nav">
+        <button class="icon-btn" id="today-date-prev" aria-label="Previous day" data-action="today-prev-day">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 id="today-date-display" class="date-heading" data-role="date-display"></h2>
+        <button class="icon-btn" id="today-date-next" aria-label="Next day" data-action="today-next-day">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <!-- Macro ring charts -->
+      <div class="card glass" id="today-macro-card">
+        <div class="macro-rings-wrapper">
+          <div class="macro-ring-center">
+            <canvas id="chart-today-macros" width="160" height="160" aria-label="Today macro breakdown donut chart"></canvas>
+            <div class="ring-center-text">
+              <span id="today-calories-consumed" class="ring-big-num">0</span>
+              <span class="ring-label">kcal</span>
+            </div>
+          </div>
+          <div class="macro-legend">
+            <div class="macro-legend-item" data-macro="protein">
+              <span class="legend-dot legend-dot--protein"></span>
+              <span class="legend-name">Protein</span>
+              <span id="today-protein-val" class="legend-val">0g</span>
+              <span class="legend-target" id="today-protein-target">/ 160g</span>
+            </div>
+            <div class="macro-legend-item" data-macro="carbs">
+              <span class="legend-dot legend-dot--carbs"></span>
+              <span class="legend-name">Carbs</span>
+              <span id="today-carbs-val" class="legend-val">0g</span>
+              <span class="legend-target" id="today-carbs-target">/ 400g</span>
+            </div>
+            <div class="macro-legend-item" data-macro="fats">
+              <span class="legend-dot legend-dot--fats"></span>
+              <span class="legend-name">Fats</span>
+              <span id="today-fats-val" class="legend-val">0g</span>
+              <span class="legend-target" id="today-fats-target">/ 80g</span>
+            </div>
+          </div>
+        </div>
+        <div class="calorie-progress-bar-wrap">
+          <div class="calorie-bar-labels">
+            <span>0</span>
+            <span id="today-calorie-target-label">3200 kcal goal</span>
+          </div>
+          <div class="progress-bar-track">
+            <div id="today-calorie-bar" class="progress-bar-fill" style="width:0%" data-role="calorie-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Today's workout summary -->
+      <div class="section-header">
+        <h3 class="section-title">Today's Workout</h3>
+        <button class="btn-text accent" data-action="open-add-workout" data-prefill-date="today">+ Add</button>
+      </div>
+      <div id="today-workout-summary" class="card glass" data-empty-state="workout">
+        <div class="empty-state" id="today-workout-empty">
+          <div class="empty-icon">🏋️</div>
+          <p class="empty-title">No workout logged yet</p>
+          <button class="btn btn-primary" data-action="open-add-workout" data-prefill-date="today">
+            Log today's workout →
+          </button>
+        </div>
+        <div id="today-workout-list" class="exercise-summary-list" hidden></div>
+        <div id="today-workout-meta" class="workout-meta-row" hidden>
+          <span id="today-volume-display" data-role="session-volume"></span>
+          <span id="today-duration-display" data-role="session-duration"></span>
+        </div>
+      </div>
+
+      <!-- Today's food log -->
+      <div class="section-header">
+        <h3 class="section-title">Today's Food</h3>
+        <button class="btn-text accent" data-action="open-add-food" data-prefill-date="today">+ Add</button>
+      </div>
+      <div id="today-food-list" class="food-entry-list card glass" data-empty-state="food">
+        <div class="empty-state" id="today-food-empty">
+          <div class="empty-icon">🥗</div>
+          <p class="empty-title">Nothing logged yet</p>
+          <button class="btn btn-primary" data-action="open-add-food" data-prefill-date="today">
+            Log your first meal →
+          </button>
+        </div>
+        <ul id="today-food-items" class="food-item-list" hidden></ul>
+        <div id="today-food-totals" class="food-totals-row" hidden>
+          <span>Total</span>
+          <span id="today-total-kcal" data-role="total-kcal">0 kcal</span>
+          <span id="today-total-p" data-role="total-protein">P: 0g</span>
+          <span id="today-total-c" data-role="total-carbs">C: 0g</span>
+          <span id="today-total-f" data-role="total-fats">F: 0g</span>
+        </div>
+      </div>
+
+      <!-- Net calories card -->
+      <div class="card glass" id="today-net-card">
+        <div class="net-row">
+          <div class="net-item">
+            <span class="net-label">Consumed</span>
+            <span id="net-consumed" class="net-value">0</span>
+          </div>
+          <div class="net-item">
+            <span class="net-label">Burned</span>
+            <span id="net-burned" class="net-value net-value--burn">0</span>
+          </div>
+          <div class="net-item">
+            <span class="net-label">Net</span>
+            <span id="net-total" class="net-value net-value--net">0</span>
+          </div>
+        </div>
+        <button class="btn-text small" data-action="open-cardio-burn">
+          + Add cardio burn
+        </button>
+      </div>
+    </section>
+
+    <!-- ────────────────────────────────────
+         TAB 2 · LOG (Workout Log)
+    ──────────────────────────────────── -->
+    <section
+      id="tab-log"
+      class="tab-panel"
+      role="tabpanel"
+      aria-labelledby="nav-log"
+      data-tab="log"
+      hidden
+    >
+      <!-- Log header -->
+      <div class="tab-header">
+        <h2 class="tab-title">Workout Log</h2>
+        <button class="btn btn-primary btn-sm" data-action="open-add-workout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Workout
+        </button>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar" role="group" aria-label="Filter by muscle group">
+        <button class="filter-chip active" data-filter="all">All</button>
+        <button class="filter-chip" data-filter="Push">Push</button>
+        <button class="filter-chip" data-filter="Pull">Pull</button>
+        <button class="filter-chip" data-filter="Legs">Legs</button>
+        <button class="filter-chip" data-filter="Full Body">Full Body</button>
+        <button class="filter-chip" data-filter="Cardio">Cardio</button>
+      </div>
+
+      <!-- Workout sessions list -->
+      <div id="log-sessions-container">
+        <!-- Populated by JS; each session card has data-session-id, data-date, data-category -->
+        <div class="empty-state" id="log-empty-state">
+          <div class="empty-icon">💪</div>
+          <p class="empty-title">No workouts logged yet</p>
+          <p class="empty-subtitle">Start tracking your first session</p>
+          <button class="btn btn-primary" data-action="open-add-workout">
+            Log your first workout →
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ────────────────────────────────────
+         TAB 3 · FOOD (Calories / Diary)
+    ──────────────────────────────────── -->
+    <section
+      id="tab-food"
+      class="tab-panel"
+      role="tabpanel"
+      aria-labelledby="nav-food"
+      data-tab="food"
+      hidden
+    >
+      <!-- Food header + date nav -->
+      <div class="date-nav">
+        <button class="icon-btn" data-action="food-prev-day" aria-label="Previous day">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 id="food-date-display" class="date-heading" data-role="date-display"></h2>
+        <button class="icon-btn" data-action="food-next-day" aria-label="Next day">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <!-- Daily calorie + macro summary -->
+      <div class="card glass" id="food-day-summary">
+        <div class="food-summary-row">
+          <div class="food-summary-item">
+            <span id="food-summary-kcal" class="food-summary-num">0</span>
+            <span class="food-summary-label">kcal</span>
+          </div>
+          <div class="food-summary-item food-summary-item--protein">
+            <span id="food-summary-protein" class="food-summary-num">0g</span>
+            <span class="food-summary-label">protein</span>
+          </div>
+          <div class="food-summary-item food-summary-item--carbs">
+            <span id="food-summary-carbs" class="food-summary-num">0g</span>
+            <span class="food-summary-label">carbs</span>
+          </div>
+          <div class="food-summary-item food-summary-item--fats">
+            <span id="food-summary-fats" class="food-summary-num">0g</span>
+            <span class="food-summary-label">fats</span>
+          </div>
+        </div>
+        <div class="progress-bar-track">
+          <div id="food-calorie-bar" class="progress-bar-fill" style="width:0%"></div>
+        </div>
+        <div class="food-copy-row">
+          <button class="btn-text small" data-action="copy-yesterday-meals">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Copy yesterday's meals
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick-add Indian food presets -->
+      <div class="section-header">
+        <h3 class="section-title">Quick Add</h3>
+      </div>
+      <div id="quick-add-grid" class="quick-add-grid" aria-label="Quick add common foods">
+        <!-- Items rendered by JS from PRESET_FOODS; each has data-preset-id -->
+        <!-- Fallback static items for no-JS context -->
+        <button class="quick-chip" data-preset="dal">Dal</button>
+        <button class="quick-chip" data-preset="rice">Rice</button>
+        <button class="quick-chip" data-preset="roti">Roti</button>
+        <button class="quick-chip" data-preset="paneer">Paneer</button>
+        <button class="quick-chip" data-preset="curd">Curd</button>
+        <button class="quick-chip" data-preset="banana">Banana</button>
+        <button class="quick-chip" data-preset="whey">Whey</button>
+        <button class="quick-chip" data-preset="oats">Oats</button>
+        <button class="quick-chip" data-preset="almonds">Almonds</button>
+        <button class="quick-chip" data-preset="eggs">Eggs</button>
+      </div>
+
+      <!-- Meal sections -->
+      <div id="food-diary" class="food-diary">
+        <!-- BREAKFAST -->
+        <div class="meal-section" data-meal="breakfast">
+          <div class="meal-header">
+            <span class="meal-icon">🌅</span>
+            <span class="meal-name">Breakfast</span>
+            <span class="meal-kcal" id="meal-kcal-breakfast">0 kcal</span>
+            <button class="btn-text accent small" data-action="open-add-food" data-meal="breakfast">+ Add</button>
+          </div>
+          <ul class="food-item-list" id="meal-list-breakfast" data-meal="breakfast"></ul>
+        </div>
+
+        <!-- LUNCH -->
+        <div class="meal-section" data-meal="lunch">
+          <div class="meal-header">
+            <span class="meal-icon">☀️</span>
+            <span class="meal-name">Lunch</span>
+            <span class="meal-kcal" id="meal-kcal-lunch">0 kcal</span>
+            <button class="btn-text accent small" data-action="open-add-food" data-meal="lunch">+ Add</button>
+          </div>
+          <ul class="food-item-list" id="meal-list-lunch" data-meal="lunch"></ul>
+        </div>
+
+        <!-- DINNER -->
+        <div class="meal-section" data-meal="dinner">
+          <div class="meal-header">
+            <span class="meal-icon">🌙</span>
+            <span class="meal-name">Dinner</span>
+            <span class="meal-kcal" id="meal-kcal-dinner">0 kcal</span>
+            <button class="btn-text accent small" data-action="open-add-food" data-meal="dinner">+ Add</button>
+          </div>
+          <ul class="food-item-list" id="meal-list-dinner" data-meal="dinner"></ul>
+        </div>
+
+        <!-- SNACKS -->
+        <div class="meal-section" data-meal="snacks">
+          <div class="meal-header">
+            <span class="meal-icon">🍎</span>
+            <span class="meal-name">Snacks</span>
+            <span class="meal-kcal" id="meal-kcal-snacks">0 kcal</span>
+            <button class="btn-text accent small" data-action="open-add-food" data-meal="snacks">+ Add</button>
+          </div>
+          <ul class="food-item-list" id="meal-list-snacks" data-meal="snacks"></ul>
+        </div>
+
+        <!-- Empty state when no food logged -->
+        <div class="empty-state" id="food-diary-empty" hidden>
+          <div class="empty-icon">🥗</div>
+          <p class="empty-title">No food logged for this day</p>
+          <button class="btn btn-primary" data-action="open-add-food">
+            Log your first meal →
+          </button>
+        </div>
+      </div>
+
+      <!-- Floating add food button -->
+      <button class="fab" id="fab-food" data-action="open-add-food" aria-label="Add food entry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="22" height="22"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </section>
+
+    <!-- ────────────────────────────────────
+         TAB 4 · PROGRESS
+    ──────────────────────────────────── -->
+    <section
+      id="tab-progress"
+      class="tab-panel"
+      role="tabpanel"
+      aria-labelledby="nav-progress"
+      data-tab="progress"
+      hidden
+    >
+      <div class="tab-header">
+        <h2 class="tab-title">Progress</h2>
+        <button class="btn-text accent" data-action="open-log-bodyweight">
+          + Weight
+        </button>
+      </div>
+
+      <!-- 7-day averages card -->
+      <div class="card glass" id="weekly-avg-card">
+        <h3 class="card-title">7-Day Averages</h3>
+        <div class="avg-grid">
+          <div class="avg-item">
+            <span id="avg-calories" class="avg-num">—</span>
+            <span class="avg-label">kcal/day</span>
+          </div>
+          <div class="avg-item avg-item--protein">
+            <span id="avg-protein" class="avg-num">—</span>
+            <span class="avg-label">protein/day</span>
+          </div>
+          <div class="avg-item">
+            <span id="avg-workouts" class="avg-num">—</span>
+            <span class="avg-label">workouts</span>
+          </div>
+          <div class="avg-item">
+            <span id="avg-volume" class="avg-num">—</span>
+            <span class="avg-label">avg volume</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Monthly summary card -->
+      <div class="card glass" id="monthly-summary-card">
+        <h3 class="card-title">
+          <span id="monthly-label">This Month</span>
+          <span class="card-title-sub">Summary</span>
+        </h3>
+        <div class="monthly-grid">
+          <div class="monthly-item">
+            <span id="monthly-workouts" class="monthly-num">0</span>
+            <span class="monthly-label">Workouts</span>
+          </div>
+          <div class="monthly-item">
+            <span id="monthly-avg-kcal" class="monthly-num">—</span>
+            <span class="monthly-label">Avg kcal</span>
+          </div>
+          <div class="monthly-item">
+            <span id="monthly-best-lift" class="monthly-num">—</span>
+            <span class="monthly-label">Best lift</span>
+          </div>
+          <div class="monthly-item">
+            <span id="monthly-total-volume" class="monthly-num">—</span>
+            <span class="monthly-label">Total vol.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bodyweight chart -->
+      <div class="card glass chart-card">
+        <div class="chart-card-header">
+          <h3 class="card-title">Bodyweight</h3>
+          <div class="chart-range-btns" role="group" aria-label="Chart time range" data-chart="bodyweight">
+            <button class="range-btn active" data-range="4w">4W</button>
+            <button class="range-btn" data-range="3m">3M</button>
+            <button class="range-btn" data-range="all">All</button>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chart-bodyweight" aria-label="Bodyweight over time line chart"></canvas>
+        </div>
+        <div class="empty-state chart-empty" id="bodyweight-chart-empty">
+          <p>No bodyweight data yet.</p>
+          <button class="btn-text accent" data-action="open-log-bodyweight">Log your weight →</button>
+        </div>
+      </div>
+
+      <!-- Strength progress chart -->
+      <div class="card glass chart-card">
+        <div class="chart-card-header">
+          <h3 class="card-title">Strength Progress</h3>
+          <select id="strength-exercise-select" class="select-input" data-role="strength-chart-exercise" aria-label="Select exercise for strength chart">
+            <option value="">Select exercise…</option>
+            <!-- Populated by JS from exercise library -->
+          </select>
+        </div>
+        <div class="chart-range-btns" role="group" aria-label="Chart time range" data-chart="strength">
+          <button class="range-btn active" data-range="4w">4W</button>
+          <button class="range-btn" data-range="3m">3M</button>
+          <button class="range-btn" data-range="all">All</button>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chart-strength" aria-label="Strength progress over time line chart"></canvas>
+        </div>
+        <div class="empty-state chart-empty" id="strength-chart-empty">
+          <p>Log some workouts to see strength progress.</p>
+        </div>
+      </div>
+
+      <!-- Weekly volume bar chart -->
+      <div class="card glass chart-card">
+        <div class="chart-card-header">
+          <h3 class="card-title">Weekly Volume</h3>
+          <div class="chart-range-btns" role="group" aria-label="Chart time range" data-chart="volume">
+            <button class="range-btn active" data-range="8w">8W</button>
+            <button class="range-btn" data-range="16w">16W</button>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chart-volume" aria-label="Weekly training volume bar chart"></canvas>
+        </div>
+        <div class="empty-state chart-empty" id="volume-chart-empty">
+          <p>No workout data to chart yet.</p>
+        </div>
+      </div>
+
+      <!-- Weekly calorie bar chart -->
+      <div class="card glass chart-card">
+        <div class="chart-card-header">
+          <h3 class="card-title">Daily Calories (14 days)</h3>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chart-calories" aria-label="Daily calorie intake bar chart"></canvas>
+        </div>
+        <div class="empty-state chart-empty" id="calories-chart-empty">
+          <p>Log some meals to see calorie trends.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ────────────────────────────────────
+         TAB 5 · SETTINGS
+    ──────────────────────────────────── -->
+    <section
+      id="tab-settings"
+      class="tab-panel"
+      role="tabpanel"
+      aria-labelledby="nav-settings"
+      data-tab="settings"
+      hidden
+    >
+      <div class="tab-header">
+        <h2 class="tab-title">Settings</h2>
+      </div>
+
+      <!-- Profile -->
+      <div class="card glass settings-card">
+        <h3 class="card-title">Profile</h3>
+        <div class="settings-grid">
+          <label class="settings-label" for="settings-name">Name</label>
+          <input id="settings-name" class="input-field" type="text" placeholder="Your name" data-setting="name" autocomplete="name" />
+
+          <label class="settings-label" for="settings-height">Height (cm)</label>
+          <input id="settings-height" class="input-field" type="number" placeholder="175" inputmode="decimal" min="50" max="300" data-setting="height" />
+
+          <label class="settings-label" for="settings-dob">Date of Birth</label>
+          <input id="settings-dob" class="input-field" type="date" data-setting="dob" />
+
+          <label class="settings-label" for="settings-sex">Sex</label>
+          <select id="settings-sex" class="select-input" data-setting="sex">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+
+          <label class="settings-label" for="settings-current-weight">Current Weight</label>
+          <div class="input-with-unit">
+            <input id="settings-current-weight" class="input-field" type="number" placeholder="75" inputmode="decimal" step="0.1" data-setting="currentWeight" />
+            <span class="unit-badge" data-unit-display="weight">kg</span>
+          </div>
+
+          <label class="settings-label" for="settings-target-weight">Goal Weight</label>
+          <div class="input-with-unit">
+            <input id="settings-target-weight" class="input-field" type="number" placeholder="80" inputmode="decimal" step="0.1" data-setting="targetWeight" />
+            <span class="unit-badge" data-unit-display="weight">kg</span>
+          </div>
+
+          <label class="settings-label" for="settings-activity">Activity Level</label>
+          <select id="settings-activity" class="select-input" data-setting="activityLevel">
+            <option value="sedentary">Sedentary (desk job)</option>
+            <option value="light">Lightly active (1–3×/week)</option>
+            <option value="moderate" selected>Moderately active (3–5×/week)</option>
+            <option value="active">Active (6–7×/week)</option>
+            <option value="very_active">Very active (2× daily)</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-block" data-action="save-profile">Save Profile</button>
+      </div>
+
+      <!-- BMI + TDEE calculator -->
+      <div class="card glass settings-card">
+        <h3 class="card-title">BMI &amp; TDEE</h3>
+        <div class="bmi-tdee-display">
+          <div class="bmi-tdee-item">
+            <span id="display-bmi" class="bmi-tdee-num">—</span>
+            <span class="bmi-tdee-label">BMI</span>
+            <span id="display-bmi-cat" class="bmi-cat"></span>
+          </div>
+          <div class="bmi-tdee-item">
+            <span id="display-tdee" class="bmi-tdee-num">—</span>
+            <span class="bmi-tdee-label">TDEE (kcal/day)</span>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-block" data-action="calc-tdee">Recalculate</button>
+      </div>
+
+      <!-- Body measurements -->
+      <div class="card glass settings-card">
+        <h3 class="card-title">Body Measurements</h3>
+        <div class="settings-grid">
+          <label class="settings-label">Chest (cm)</label>
+          <input class="input-field" type="number" inputmode="decimal" step="0.5" placeholder="100" data-measurement="chest" />
+          <label class="settings-label">Waist (cm)</label>
+          <input class="input-field" type="number" inputmode="decimal" step="0.5" placeholder="85" data-measurement="waist" />
+          <label class="settings-label">Hips (cm)</label>
+          <input class="input-field" type="number" inputmode="decimal" step="0.5" placeholder="95" data-measurement="hips" />
+          <label class="settings-label">Arms (cm)</label>
+          <input class="input-field" type="number" inputmode="decimal" step="0.5" placeholder="38" data-measurement="arms" />
+          <label class="settings-label">Thighs (cm)</label>
+          <input class="input-field" type="number" inputmode="decimal" step="0.5" placeholder="58" data-measurement="thighs" />
+        </div>
+        <button class="btn btn-secondary btn-block" data-action="save-measurements">Save Measurements</button>
+      </div>
+
+      <!-- Appearance & units -->
+      <div class="card glass settings-card">
+        <h3 class="card-title">Appearance &amp; Units</h3>
+        <div class="toggle-row">
+          <span class="toggle-label">Dark Mode</span>
+          <label class="toggle-switch" aria-label="Toggle dark mode">
+            <input type="checkbox" id="toggle-dark-mode" data-setting="darkMode" checked />
+            <span class="toggle-knob"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Use lbs (instead of kg)</span>
+          <label class="toggle-switch" aria-label="Toggle weight unit">
+            <input type="checkbox" id="toggle-unit-lbs" data-setting="useLbs" />
+            <span class="toggle-knob"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Daily targets -->
+      <div class="card glass settings-card">
+        <h3 class="card-title">Daily Targets</h3>
+        <div class="settings-grid">
+          <label class="settings-label" for="target-calories">Calories (kcal)</label>
+          <input id="target-calories" class="input-field" type="number" inputmode="numeric" placeholder="3200" data-setting="calorieTarget" />
+
+          <label class="settings-label" for="target-protein">Protein (g)</label>
+          <input id="target-protein" class="input-field" type="number" inputmode="numeric" placeholder="160" data-setting="proteinTarget" />
+
+          <label class="settings-label" for="target-carbs">Carbs (g)</label>
+          <input id="target-carbs" class="input-field" type="number" inputmode="numeric" placeholder="400" data-setting="carbTarget" />
+
+          <label class="settings-label" for="target-fats">Fats (g)</label>
+          <input id="target-fats" class="input-field" type="number" inputmode="numeric" placeholder="80" data-setting="fatTarget" />
+        </div>
+        <button class="btn btn-primary btn-block" data-action="save-targets">Save Targets</button>
+      </div>
+
+      <!-- Data management -->
+      <div class="card glass settings-card">
+        <h3 class="card-title">Data Management</h3>
+        <div class="data-btn-grid">
+          <button class="btn btn-secondary" data-action="export-json">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export JSON
+          </button>
+          <button class="btn btn-secondary" data-action="export-csv">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+          <button class="btn btn-secondary" data-action="trigger-import">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10" transform="rotate(180, 12, 12)"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Import JSON
+          </button>
+          <button class="btn btn-danger" data-action="confirm-clear-data">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            Clear All Data
+          </button>
+        </div>
+        <!-- Hidden file input for JSON import -->
+        <input type="file" id="import-file-input" accept=".json" hidden data-role="import-trigger" />
+      </div>
+
+      <!-- App info footer -->
+      <div class="settings-footer">
+        <p>FitTrack Pro · All data stored locally on your device.</p>
+        <p>v1.0.0</p>
+      </div>
+    </section>
+
+  </main>
+  <!-- /tab-container -->
+
+  <!-- ══════════════════════════════════════
+       BOTTOM NAVIGATION BAR
+  ═══════════════════════════════════════ -->
+  <nav id="bottom-nav" role="tablist" aria-label="Main navigation">
+    <button
+      id="nav-today"
+      class="nav-item active"
+      role="tab"
+      aria-selected="true"
+      aria-controls="tab-today"
+      data-target="tab-today"
+    >
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      <span class="nav-label">Today</span>
+    </button>
+    <button
+      id="nav-log"
+      class="nav-item"
+      role="tab"
+      aria-selected="false"
+      aria-controls="tab-log"
+      data-target="tab-log"
+    >
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+      <span class="nav-label">Log</span>
+    </button>
+    <button
+      id="nav-food"
+      class="nav-item"
+      role="tab"
+      aria-selected="false"
+      aria-controls="tab-food"
+      data-target="tab-food"
+    >
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M18 8h1a4 4 0 010 8h-1"/>
+        <path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/>
+        <line x1="6" y1="1" x2="6" y2="4"/>
+        <line x1="10" y1="1" x2="10" y2="4"/>
+        <line x1="14" y1="1" x2="14" y2="4"/>
+      </svg>
+      <span class="nav-label">Food</span>
+    </button>
+    <button
+      id="nav-progress"
+      class="nav-item"
+      role="tab"
+      aria-selected="false"
+      aria-controls="tab-progress"
+      data-target="tab-progress"
+    >
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      <span class="nav-label">Progress</span>
+    </button>
+    <button
+      id="nav-settings"
+      class="nav-item"
+      role="tab"
+      aria-selected="false"
+      aria-controls="tab-settings"
+      data-target="tab-settings"
+    >
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+      </svg>
+      <span class="nav-label">Settings</span>
+    </button>
+  </nav>
+  <!-- /bottom-nav -->
+
+</div>
+<!-- /app -->
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODALS / DIALOGS
+     All modals use the same overlay + dialog pattern.
+     JS toggles .modal-open on <body> and .active on .modal-overlay.
+═══════════════════════════════════════════════════════════════ -->
+
+<!-- ─── MODAL: ADD / EDIT WORKOUT SESSION ─── -->
+<div
+  id="modal-add-workout"
+  class="modal-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-workout-title"
+  data-modal="add-workout"
+  hidden
+>
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 id="modal-workout-title" class="modal-title">New Workout</h2>
+      <button class="modal-close icon-btn" data-action="close-modal" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Session metadata -->
+      <div class="form-row">
+        <label class="form-label" for="workout-date">Date</label>
+        <input id="workout-date" class="input-field" type="date" data-workout-field="date" />
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="workout-category">Split / Category</label>
+        <select id="workout-category" class="select-input" data-workout-field="category">
+          <option value="Push">Push</option>
+          <option value="Pull">Pull</option>
+          <option value="Legs">Legs</option>
+          <option value="Full Body">Full Body</option>
+          <option value="Cardio">Cardio</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="workout-duration">Duration (min)</label>
+        <input id="workout-duration" class="input-field" type="number" inputmode="numeric" placeholder="60" min="1" max="300" data-workout-field="duration" />
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="workout-notes">Notes</label>
+        <textarea id="workout-notes" class="input-field textarea-field" rows="2" placeholder="How did it feel?" data-workout-field="notes"></textarea>
+      </div>
+
+      <!-- Exercise list within this session -->
+      <div class="exercises-in-session">
+        <div class="exercises-header">
+          <span class="section-title">Exercises</span>
+          <button class="btn-text accent" data-action="add-exercise-to-session">+ Add Exercise</button>
+        </div>
+        <div id="session-exercises-list">
+          <!-- Each exercise block injected by JS; has data-exercise-index -->
+          <!-- Template rendered per exercise: -->
+          <!--
+          <div class="exercise-block" data-exercise-index="0">
+            <div class="exercise-block-header">
+              <select class="select-input exercise-name-select" data-field="name">...</select>
+              <button class="icon-btn danger" data-action="remove-exercise" data-index="0">×</button>
+            </div>
+            <div class="sets-list" data-exercise-index="0">
+              [set rows]
+            </div>
+            <button class="btn-text small" data-action="add-set" data-exercise-index="0">+ Set</button>
+          </div>
+          -->
+        </div>
+        <div id="session-exercises-empty" class="empty-hint">
+          Tap "+ Add Exercise" to begin
+        </div>
+      </div>
+
+      <!-- Duplicate last workout shortcut -->
+      <button class="btn btn-secondary btn-block" data-action="duplicate-last-workout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        Duplicate Last Workout
+      </button>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
+      <button class="btn btn-primary" data-action="save-workout" id="save-workout-btn">
+        Save Workout
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL: EXERCISE PICKER ─── -->
+<div
+  id="modal-exercise-picker"
+  class="modal-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-exercise-picker-title"
+  data-modal="exercise-picker"
+  hidden
+>
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 id="modal-exercise-picker-title" class="modal-title">Pick Exercise</h2>
+      <button class="modal-close icon-btn" data-action="close-modal" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <input
+        id="exercise-search"
+        class="input-field"
+        type="search"
+        placeholder="Search exercises…"
+        data-role="exercise-search"
+        autocomplete="off"
+      />
+      <!-- Category filter tabs -->
+      <div class="filter-bar compact" role="group" aria-label="Filter exercises by category" data-role="exercise-category-filter">
+        <button class="filter-chip active" data-filter="All">All</button>
+        <button class="filter-chip" data-filter="Push">Push</button>
+        <button class="filter-chip" data-filter="Pull">Pull</button>
+        <button class="filter-chip" data-filter="Legs">Legs</button>
+        <button class="filter-chip" data-filter="Cardio">Cardio</button>
+        <button class="filter-chip" data-filter="Core">Core</button>
+      </div>
+      <ul id="exercise-picker-list" class="picker-list" role="listbox" aria-label="Exercise list">
+        <!-- Populated by JS from EXERCISE_LIBRARY + custom entries -->
+      </ul>
+      <!-- Custom exercise quick-add -->
+      <div class="custom-exercise-row">
+        <input
+          id="custom-exercise-name"
+          class="input-field"
+          type="text"
+          placeholder="Or type a custom exercise name…"
+          data-role="custom-exercise-input"
+        />
+        <button class="btn btn-secondary" data-action="add-custom-exercise">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL: SET EDITOR (inline inside workout modal, but also standalone on long-press) ─── -->
+<!-- Each exercise in session uses the set-row template below (injected by JS) -->
+<!--
+  <div class="set-row" data-set-index="0">
+    <span class="set-num">1</span>
+    <div class="set-input-group">
+      <label>Reps</label>
+      <div class="stepper">
+        <button class="stepper-btn" data-action="decrement" data-field="reps">−</button>
+        <input class="stepper-input" type="number" inputmode="numeric" value="8" min="1" max="999" data-field="reps" />
+        <button class="stepper-btn" data-action="increment" data-field="reps">+</button>
+      </div>
+    </div>
+    <div class="set-input-group">
+      <label>Weight <span data-unit-display="weight">kg</span></label>
+      <div class="stepper">
+        <button class="stepper-btn" data-action="decrement" data-field="weight">−</button>
+        <input class="stepper-input" type="number" inputmode="decimal" value="60" step="2.5" data-field="weight" />
+        <button class="stepper-btn" data-action="increment" data-field="weight">+</button>
+      </div>
+    </div>
+    <span class="pr-badge" hidden aria-label="Personal Record">PR</span>
+    <button class="icon-btn danger small" data-action="remove-set" data-set-index="0">×</button>
+  </div>
+-->
+
+<!-- ─── MODAL: REST TIMER ─── -->
+<div
+  id="modal-rest-timer"
+  class="modal-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-timer-title"
+  data-modal="rest-timer"
+  hidden
+>
+  <div class="modal-sheet modal-sheet--centered">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 id="modal-timer-title" class="modal-title">Rest Timer</h2>
+      <button class="modal-close icon-btn" data-action="close-modal" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body timer-body">
+      <!-- Circular countdown display -->
+      <div class="timer-ring-wrap">
+        <svg class="timer-ring-svg" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="timer-ring-track" cx="60" cy="60" r="54" />
+          <circle id="timer-ring-progress" class="timer-ring-progress" cx="60" cy="60" r="54" />
+        </svg>
+        <div class="timer-display">
+          <span id="timer-minutes" class="timer-digit">01</span>
+          <span class="timer-colon">:</span>
+          <span id="timer-seconds" class="timer-digit">30</span>
+        </div>
+      </div>
+      <!-- Preset durations -->
+      <div class="timer-presets" role="group" aria-label="Timer duration presets">
+        <button class="timer-preset-btn" data-seconds="30">30s</button>
+        <button class="timer-preset-btn" data-seconds="60">1m</button>
+        <button class="timer-preset-btn active" data-seconds="90">1:30</button>
+        <button class="timer-preset-btn" data-seconds="120">2m</button>
+        <button class="timer-preset-btn" data-seconds="180">3m</button>
+        <button class="timer-preset-btn" data-seconds="300">5m</button>
+      </div>
+      <!-- Custom duration input -->
+      <div class="timer-custom-row">
+        <input
+          id="timer-custom-seconds"
+          class="input-field input-field--sm"
+          type="number"
+          inputmode="numeric"
+          placeholder="Custom (s)"
+          min="5"
+          max="3600"
+          data-role="custom-timer-input"
+        />
+      </div>
+      <!-- Controls -->
+      <div class="timer-controls">
+        <button class="btn btn-secondary" id="timer-reset-btn" data-action="timer-reset">Reset</button>
+        <button class="btn btn-primary btn-lg" id="timer-start-btn" data-action="timer-toggle" data-state="stopped">
+          Start
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL: ADD FOOD ENTRY ─── -->
+<div
+  id="modal-add-food"
+  class="modal-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-food-title"
+  data-modal="add-food"
+  hidden
+>
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 id="modal-food-title" class="modal-title">Add Food</h2>
+      <button class="modal-close icon-btn" data-action="close-modal" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <!-- Food search / name -->
+      <div class="form-row">
+        <label class="form-label" for="food-name-input">Food Name</label>
+        <input
+          id="food-name-input"
+          class="input-field"
+          type="text"
+          placeholder="e.g. Chicken breast 150g"
+          autocomplete="off"
+          data-food-field="name"
+        />
+        <!-- Autocomplete dropdown populated by JS from food library -->
+        <ul id="food-autocomplete" class="autocomplete-list" hidden role="listbox" aria-label="Food suggestions"></ul>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label" for="food-meal-select">Meal</label>
+        <select id="food-meal-select" class="select-input" data-food-field="meal">
+          <option value="breakfast">Breakfast</option>
+          <option value="lunch">Lunch</option>
+          <option value="dinner" selected>Dinner</option>
+          <option value="snacks">Snacks</option>
+        </select>
+      </div>
+
+      <!-- Macro inputs -->
+      <div class="macro-inputs-grid">
+        <div class="form-row">
+          <label class="form-label" for="food-calories">Calories</label>
+          <input id="food-calories" class="input-field" type="number" inputmode="numeric" placeholder="0" min="0" step="1" data-food-field="calories" />
+        </div>
+        <div class="form-row macro-input--protein">
+          <label class="form-label" for="food-protein">Protein (g)</label>
+          <input id="food-protein" class="input-field" type="number" inputmode="decimal" placeholder="0" min="0" step="0.1" data-food-field="protein" />
+        </div>
+        <div class="form-row macro-input--carbs">
+          <label class="form-label" for="food-carbs">Carbs (g)</label>
+          <input id="food-carbs" class="input-field" type="number" inputmode="decimal" placeholder="0" min="0" step="0.1" data-food-field="carbs" />
+        </div>
+        <div class="form-row macro-input--fats">
+          <label class="form-label" for="food-fats">Fats (g)</label>
+          <input id="food-fats" class="input-field" type="number" inputmode="decimal" placeholder="0" min="0" step="0.1" data-food-field="fats" />
+        </div>
+      </div>
+
+      <!-- Save to library toggle -->
+      <div class="toggle-row">
+        <label class="toggle-label" for="food-save-to-library">Save to my food library</label>
+        <label class="toggle-switch" aria-label="Save food to library">
+          <input type="checkbox" id="food-save-to-library" data-food-field="saveToLibrary" />
+          <span class="toggle-knob"></span>
+        </label>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
+      <button class="btn btn-primary" data-action="save-food-entry">Add Food</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL: LOG BODY WEIGHT ─── -->
+<div
+  id="modal-log-bodyweight"
+  class="modal-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-bw-title"
+  data-modal="log-bodyweight"
+  hidden
+>
+  <div class="modal-sheet modal-sheet--compact">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 id="modal-bw-title" class="modal-title">Log Bodyweight</h2>
+      <button class="modal-close icon-btn" data-action="close-modal" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label" for="bw-date">Date</label>
+        <input id="bw-date" class="input-field" type="date" data-bw-field="date" />
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="bw-weight">Weight</label>
+        <div class="input-with-unit">
+          <input id="bw-weight" class="input-field" type="number" inputmode="decimal" step="0.1" min="20" max="300" placeholder="75.0" data-bw-field="weight" />
+          <span class="unit-badge" data-unit-display="weight">kg</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
+      <button class="btn btn-primary" data-action="save-bodyweight">Log Weight</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL: CARDIO BURN ENTRY ─── -->
+<div
+  id="modal-cardio-burn"
+  class="modal-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-cardio-title"
+  data-modal="cardio-burn"
+  hidden
+>
+  <div class="modal-sheet modal-sheet--compact">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2 id="modal-cardio-title" class="modal-title">Cardio Burn</h2>
+      <button class="modal-close icon-btn" data-action="close-modal" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label" for="cardio-activity">Activity</label>
+        <input id="cardio-activity" class="input-field" type="text" placeholder="e.g. Running, Cycling" data-cardio-field="activity" />
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="cardio-kcal">Calories Burned (kcal)</label>
+        <input id="cardio-kcal" class="input-field" type="number" inputmode="numeric" placeholder="300" min="1" data-cardio-field="caloriesBurned" />
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="cardio-duration">Duration (min)</label>
+        <input id="cardio-duration" class="input-field" type="number" inputmode="numeric" placeholder="30" min="1" data-cardio-field="duration" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
+      <button class="btn btn-primary" data-action="save-cardio-burn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL: CONFIRM DELETE / DESTRUCTIVE ACTION ─── -->
+<div
+  id="modal-confirm"
+  class="modal-overlay"
+  role="alertdialog"
+  aria-modal="true"
+  aria-labelledby="modal-confirm-title"
+  aria-describedby="modal-confirm-body"
+  data-modal="confirm"
+  hidden
+>
+  <div class="modal-sheet modal-sheet--compact">
+    <div class="modal-header">
+      <h2 id="modal-confirm-title" class="modal-title">Are you sure?</h2>
+    </div>
+    <div class="modal-body">
+      <p id="modal-confirm-body" class="confirm-message">This action cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-action="close-modal">Cancel</button>
+      <button class="btn btn-danger" id="modal-confirm-ok" data-action="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── FLOATING REST TIMER CHIP (visible during active timer, outside modals) ─── -->
+<div id="timer-chip" class="timer-chip" hidden aria-live="polite" role="timer" aria-label="Rest timer">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+  <span id="timer-chip-display">1:30</span>
+  <button class="timer-chip-close" data-action="timer-stop" aria-label="Stop timer">×</button>
+</div>
+
+<!-- ─── LIVE REGION for PR announcements ─── -->
+<div id="pr-announcer" role="alert" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
+
+<!-- App JS (loaded last so DOM is ready) -->
+<script src="app.js"></script>
+
+</body>
+</html>
